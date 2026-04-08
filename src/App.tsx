@@ -291,7 +291,26 @@ export default function App() {
   const [tempSettings, setTempSettings] = useState<AppSettings>(settings);
   const [tempPrizes, setTempPrizes] = useState<Prize[]>(prizes);
   const [tempAllParticipants, setTempAllParticipants] = useState<Participant[]>(() => 
-    Array.from(new Map<string, Participant>(prizes.flatMap(p => p.list).map(p => [p.id, p])).values())
+    (() => {
+      const saved = localStorage.getItem('lucky-draw-all-participants');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Participant[];
+        return Array.from(new Map<string, Participant>(parsed.map(p => [p.id, p])).values());
+      }
+
+      return Array.from(new Map<string, Participant>(prizes.flatMap(p => p.list).map(p => [p.id, p])).values());
+    })()
+  );
+  const [allParticipants, setAllParticipants] = useState<Participant[]>(() => 
+    (() => {
+      const saved = localStorage.getItem('lucky-draw-all-participants');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Participant[];
+        return Array.from(new Map<string, Participant>(parsed.map(p => [p.id, p])).values());
+      }
+
+      return Array.from(new Map<string, Participant>(prizes.flatMap(p => p.list).map(p => [p.id, p])).values());
+    })()
   );
 
   const spinIntervalRef = useRef<number | null>(null);
@@ -301,9 +320,9 @@ export default function App() {
     if (showSettings) {
       setTempSettings(settings);
       setTempPrizes(prizes);
-      setTempAllParticipants(Array.from(new Map<string, Participant>(prizes.flatMap(p => p.list).map(p => [p.id, p])).values()));
+      setTempAllParticipants(allParticipants);
     }
-  }, [showSettings, settings, prizes]);
+  }, [showSettings, settings, prizes, allParticipants]);
 
   useEffect(() => {
     localStorage.setItem('lucky-draw-prizes', JSON.stringify(prizes));
@@ -316,6 +335,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('lucky-draw-settings', JSON.stringify(settings));
   }, [settings]);
+
+  useEffect(() => {
+    localStorage.setItem('lucky-draw-all-participants', JSON.stringify(allParticipants));
+  }, [allParticipants]);
 
   const currentPrizeIndex = prizes.findIndex(p => p.id === currentPrizeId);
   const currentPrize = prizes[currentPrizeIndex];
@@ -330,9 +353,7 @@ export default function App() {
     .filter(p => !winners.some(w => w.person.id === p.id));
 
   // All participants for display (remove duplicates)
-  const displayParticipants: Participant[] = Array.from(new Map<string, Participant>(
-    prizes.flatMap(prize => prize.list).map(p => [p.id, p])
-  ).values());
+  const displayParticipants: Participant[] = allParticipants;
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
@@ -406,6 +427,8 @@ export default function App() {
     });
 
     setIsConfirming(false);
+    setShowFullInfo(false);
+    setDisplayPerson(null);
     showNotification('Đã xác nhận người trúng giải!', 'success');
   };
 
@@ -514,10 +537,12 @@ export default function App() {
     
     // Save to localStorage immediately
     localStorage.setItem('lucky-draw-prizes', JSON.stringify(newPrizes));
+    localStorage.setItem('lucky-draw-all-participants', JSON.stringify(tempAllParticipants));
     
     // Update state
     setSettings(tempSettings);
     setPrizes(newPrizes);
+    setAllParticipants(Array.from(new Map<string, Participant>(tempAllParticipants.map(p => [p.id, p])).values()));
     setShowSettings(false);
     
     // confetti for feedback
@@ -578,8 +603,8 @@ export default function App() {
           )}
         </div>
 
-        {/* Center: Title */}
-        <div className="flex-1 flex justify-center items-center">
+        {/* Right zone (same width as main content): title + actions */}
+        <div className="w-3/4 relative flex items-center justify-center">
           <h1 
             style={{ 
               color: settings.titleColor, 
@@ -588,38 +613,38 @@ export default function App() {
             }}
             className="font-black tracking-tight drop-shadow-2xl text-center"
           >
-            Lucky Draw Pro
+            {settings.title}
           </h1>
-        </div>
 
-        {/* Right: Buttons */}
-        <div className="w-1/4 flex justify-end gap-3">
-          <button 
-            onClick={() => setShowWinners(true)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors relative bg-slate-800/50"
-            title="Danh sách trúng giải"
-          >
-            <ListChecks size={24} />
-            {winners.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-[10px] flex items-center justify-center rounded-full border-2 border-slate-900">
-                {winners.length}
-              </span>
-            )}
-          </button>
-          <button 
-            onClick={handleOpenParticipants}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors relative bg-slate-800/50"
-            title="Danh sách người tham gia (Admin)"
-          >
-            <Users size={24} />
-          </button>
-          <button 
-            onClick={() => setShowSettings(true)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors bg-slate-800/50"
-            title="Cài đặt"
-          >
-            <Settings size={24} />
-          </button>
+          {/* Actions */}
+          <div className="absolute right-0 flex justify-end gap-3">
+            <button 
+              onClick={() => setShowWinners(true)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors relative bg-slate-800/50"
+              title="Danh sách trúng giải"
+            >
+              <ListChecks size={24} />
+              {winners.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-[10px] flex items-center justify-center rounded-full border-2 border-slate-900">
+                  {winners.length}
+                </span>
+              )}
+            </button>
+            <button 
+              onClick={handleOpenParticipants}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors relative bg-slate-800/50"
+              title="Danh sách người tham gia (Admin)"
+            >
+              <Users size={24} />
+            </button>
+            <button 
+              onClick={() => setShowSettings(true)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors bg-slate-800/50"
+              title="Cài đặt"
+            >
+              <Settings size={24} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -711,13 +736,13 @@ export default function App() {
                   className="flex flex-col gap-6"
                 >
                   {isConfirming && (
-                    <div className="mb-4 inline-block px-6 py-2 bg-yellow-500 text-slate-900 font-black rounded-full animate-bounce uppercase tracking-widest text-sm">
+                    <div className="mb-4 inline-block px-6 py-2 bg-yellow-500 text-slate-900 font-black rounded-full animate-bounce uppercase tracking-widest text-2xl">
                       Chúc mừng bạn may mắn trúng {currentPrize?.name}!
                     </div>
                   )}
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">GEN</span>
+                    <span className="text-slate-500 text-[1.5rem] font-bold uppercase tracking-widest leading-none">GEN</span>
                     <div className="text-5xl md:text-7xl font-mono font-bold text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.3)]">
                       {displayPerson.id}
                     </div>
@@ -730,9 +755,9 @@ export default function App() {
                         animate={{ opacity: 1, height: 'auto' }}
                         className="space-y-4 overflow-hidden"
                       >
-                        <div className="flex flex-col gap-1">
-                          <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">Họ và Tên</span>
-                          <div className="text-4xl md:text-6xl font-black text-white drop-shadow-lg">
+                        <div className="flex flex-col gap-3 mt-[10px]">
+                          <span className="text-slate-500 text-[1.5rem] font-bold uppercase tracking-widest leading-none">Họ và Tên</span>
+                          <div className="text-4xl md:text-6xl font-black text-white drop-shadow-lg leading-[1.25] pb-[2px]">
                             {displayPerson.name}
                           </div>
                         </div>
@@ -1190,7 +1215,7 @@ export default function App() {
                               transition={{ delay: i * 0.03 }}
                               className="bg-white/5 hover:bg-white/10 transition-colors p-4 rounded-2xl border border-white/5 flex flex-col gap-2 group"
                             >
-                              <div className="text-lg font-black text-white group-hover:text-yellow-400 transition-colors mb-1">
+                              <div className="text-lg font-black text-white group-hover:text-yellow-400 transition-colors mb-1 leading-[1.4] pb-[2px]">
                                 {w.person.name}
                               </div>
                               <div className="flex items-center flex-wrap gap-x-3 gap-y-2 text-[11px] text-slate-400 font-medium">

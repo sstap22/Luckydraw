@@ -15,7 +15,6 @@ import spinSoundFile from './Sound/soundspin.mp3';
 interface Participant {
   id: string;
   name: string;
-  phone: string;
 }
 
 interface Prize {
@@ -58,25 +57,24 @@ const DEFAULT_PRIZES: Prize[] = [
 
 const SAMPLE_PARTICIPANTS: Record<string, Participant[]> = {
   A: [
-    { id: 'A001', name: 'Nguyễn Văn A', phone: '0901234567' },
-    { id: 'A002', name: 'Trần Thị B', phone: '0912345678' },
+    { id: 'A001', name: 'Nguyễn Văn A' },
+    { id: 'A002', name: 'Trần Thị B' },
   ],
   B: [
-    { id: 'B001', name: 'Lê Văn C', phone: '0923456789' },
-    { id: 'B002', name: 'Phạm Thị D', phone: '0934567890' },
-    { id: 'B003', name: 'Hoàng Văn E', phone: '0945678901' },
-    { id: 'B004', name: 'Đặng Thị F', phone: '0956789012' },
+    { id: 'B001', name: 'Lê Văn C' },
+    { id: 'B002', name: 'Phạm Thị D' },
+    { id: 'B003', name: 'Hoàng Văn E' },
+    { id: 'B004', name: 'Đặng Thị F' },
   ],
   C: [
-    { id: 'C001', name: 'Bùi Văn G', phone: '0967890123' },
-    { id: 'C002', name: 'Vũ Thị H', phone: '0978901234' },
-    { id: 'C003', name: 'Đỗ Văn I', phone: '0989012345' },
-    { id: 'C004', name: 'Ngô Thị K', phone: '0990123456' },
+    { id: 'C001', name: 'Bùi Văn G' },
+    { id: 'C002', name: 'Vũ Thị H' },
+    { id: 'C003', name: 'Đỗ Văn I' },
+    { id: 'C004', name: 'Ngô Thị K' },
   ],
   D: Array.from({ length: 20 }, (_, i) => ({
     id: `D${String(i + 1).padStart(3, '0')}`,
     name: `Người dùng D${i + 1}`,
-    phone: `09${Math.floor(Math.random() * 90000000 + 10000000)}`,
   })),
 };
 
@@ -496,7 +494,16 @@ export default function App() {
 
   const handleSaveSettings = () => {
     setSettings(tempSettings);
-    setPrizes(tempPrizes);
+    // Merge tempPrizes with existing prizes to preserve participant lists
+    setPrizes((prevPrizes: Prize[]) => 
+      tempPrizes.map((tempPrize: Prize) => {
+        const existingPrize = prevPrizes.find((p: Prize) => p.id === tempPrize.id);
+        return {
+          ...tempPrize,
+          list: existingPrize?.list || tempPrize.list || []
+        };
+      })
+    );
     setShowSettings(false);
     // confetti for feedback
     confetti({
@@ -512,13 +519,13 @@ export default function App() {
 
     // BOM for UTF-8 support in Excel
     const BOM = '\uFEFF';
-    let csvContent = "Giải thưởng,Họ tên,Gen,Số điện thoại,Thời gian\n";
+    let csvContent = "Giải thưởng,Họ tên,Gen,Thời gian\n";
     
     winners.forEach(w => {
       const prize = prizes.find(p => p.id === w.prizeId);
       const prizeName = prize ? prize.name : w.prizeId;
       const time = new Date(w.timestamp).toLocaleString();
-      csvContent += `"${prizeName}","${w.person.name}","${w.person.id}","${w.person.phone}","${time}"\n`;
+      csvContent += `"${prizeName}","${w.person.name}","${w.person.id}","${time}"\n`;
     });
 
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -557,16 +564,16 @@ export default function App() {
         </div>
 
         {/* Center: Title */}
-        <div className="flex-1 text-center">
+        <div className="flex-1 flex justify-center items-center">
           <h1 
             style={{ 
               color: settings.titleColor, 
               fontSize: `${settings.titleSize}px`,
               fontFamily: settings.titleFont 
             }}
-            className="font-black tracking-tight drop-shadow-2xl"
+            className="font-black tracking-tight drop-shadow-2xl text-center"
           >
-            {settings.title}
+            Lucky Draw Pro
           </h1>
         </div>
 
@@ -602,8 +609,8 @@ export default function App() {
       </header>
 
       <div className="flex flex-1 overflow-y-auto">
-        {/* Sidebar - Prize Selector (1/5 width) */}
-        <aside className="w-1/5 bg-transparent p-6 flex flex-col gap-4 overflow-y-auto border-r border-white/5">
+        {/* Sidebar - Prize Selector (1/4 width) */}
+        <aside className="w-1/4 bg-transparent p-6 flex flex-col gap-4 overflow-y-auto border-r border-white/5">
           <div className="flex items-center gap-2 mb-4">
             <Trophy className="text-yellow-500" size={20} />
             <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Danh sách giải</h2>
@@ -642,10 +649,10 @@ export default function App() {
           ))}
         </aside>
 
-        {/* Main Content (4/5 width) */}
-        <main className="w-4/5 flex flex-col items-center justify-start py-12 px-8 relative">
+        {/* Main Content (3/4 width) */}
+        <main className="w-3/4 flex flex-col items-center justify-start py-12 px-8 relative">
           {/* Display Area */}
-          <div className="relative w-full max-w-4xl min-h-[650px] bg-gradient-to-b from-slate-800/80 to-slate-900/90 backdrop-blur-md rounded-[40px] border-4 border-slate-700/50 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-12 text-center transition-all duration-500">
+          <div className="relative w-full max-w-5xl min-h-[600px] bg-gradient-to-b from-slate-800/80 to-slate-900/90 backdrop-blur-md rounded-[40px] border-4 border-slate-700/50 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-12 text-center transition-all duration-500">
             {/* Decorative elements */}
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
               <div className="absolute top-10 left-10 w-32 h-32 bg-yellow-500 rounded-full blur-3xl" />
@@ -817,7 +824,7 @@ export default function App() {
             <div className="p-6 overflow-y-auto space-y-8">
               {/* All Participants List */}
               <div className="space-y-4">
-                <label className="text-sm font-medium text-slate-400">Danh sách tất cả người tham gia ( Tên,GEN,SĐT)</label>
+                <label className="text-sm font-medium text-slate-400">Danh sách tất cả người tham gia (Tên,GEN)</label>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-yellow-500 uppercase">Tất cả người tham gia</span>
@@ -825,13 +832,13 @@ export default function App() {
                   </div>
                   <textarea 
                     rows={6}
-                    placeholder="Nguyễn Văn A,A001,0901234567&#10;Trần Thị B,B001,0912345678&#10;Lê Văn C,C001,0923456789"
-                    value={tempAllParticipants.map(p => `${p.name},${p.id},${p.phone}`).join('\n')}
+                    placeholder="Nguyễn Văn A,A001&#10;Trần Thị B,B001&#10;Lê Văn C,C001"
+                    value={tempAllParticipants.map(p => `${p.name},${p.id}`).join('\n')}
                     onChange={(e) => {
                       const lines = e.target.value.split('\n').filter(l => l.trim());
                       const newList = lines.map(line => {
-                        const [name, id, phone] = line.split(',').map(s => s.trim());
-                        return { name: name || 'N/A', id: id || 'N/A', phone: phone || 'N/A' };
+                        const [name, id] = line.split(',').map(s => s.trim());
+                        return { name: name || 'N/A', id: id || 'N/A' };
                       });
                       setTempAllParticipants(newList);
                     }}
@@ -1089,7 +1096,7 @@ export default function App() {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
                   <input 
                     type="text"
-                    placeholder="Tìm tên, GEN hoặc SĐT..."
+                    placeholder="Tìm tên hoặc GEN..."
                     value={winnerSearchQuery}
                     onChange={(e) => setWinnerSearchQuery(e.target.value)}
                     className="w-80 bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-all text-white"
@@ -1135,8 +1142,7 @@ export default function App() {
                       const query = winnerSearchQuery.toLowerCase();
                       return (
                         w.person.name.toLowerCase().includes(query) ||
-                        w.person.id.toLowerCase().includes(query) ||
-                        w.person.phone.includes(query)
+                        w.person.id.toLowerCase().includes(query)
                       );
                     });
                     if (prizeWinners.length === 0) return null;
@@ -1177,12 +1183,6 @@ export default function App() {
                                   <span className="text-[9px] text-slate-600 uppercase font-bold">GEN:</span>
                                   <span className="font-mono text-yellow-500/80">{w.person.id}</span>
                                 </div>
-                                <div className="w-1 h-1 bg-slate-700 rounded-full" />
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] text-slate-600 uppercase font-bold">SĐT:</span>
-                                  <span>{w.person.phone.replace(/(\d{3})(\d{3})(\d{4})/, '$1***$3')}</span>
-                                </div>
-                                <div className="w-1 h-1 bg-slate-700 rounded-full" />
                                 <div className="flex items-center gap-2">
                                   <div className="px-2 py-0.5 bg-white/5 rounded-md text-[9px] font-mono text-slate-500">
                                     #{i + 1}
@@ -1343,7 +1343,7 @@ export default function App() {
             
             <div className="flex-1 overflow-x-auto p-8 bg-transparent">
               <div className="mb-8">
-                <h3 className="text-xl font-bold text-white mb-4">Danh sách người tham gia theo giải (CSV: Tên,GEN,SĐT)</h3>
+                <h3 className="text-xl font-bold text-white mb-4">Danh sách người tham gia theo giải (CSV: Tên,GEN)</h3>
                 <div className="space-y-6">
                   {prizes.map((prize, idx) => (
                     <div key={prize.id} className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
@@ -1356,13 +1356,13 @@ export default function App() {
                       
                       <textarea 
                         rows={4}
-                        placeholder="Nguyễn Văn A,A001,0901234567"
-                        defaultValue={prize.list.map(p => `${p.name},${p.id},${p.phone}`).join('\n')}
+                        placeholder="Nguyễn Văn A,A001"
+                        defaultValue={prize.list.map(p => `${p.name},${p.id}`).join('\n')}
                         onBlur={(e) => {
                           const lines = e.target.value.split('\n').filter(l => l.trim());
                           const newList = lines.map(line => {
-                            const [name, id, phone] = line.split(',').map(s => s.trim());
-                            return { name: name || 'N/A', id: id || 'N/A', phone: phone || 'N/A' };
+                            const [name, id] = line.split(',').map(s => s.trim());
+                            return { name: name || 'N/A', id: id || 'N/A' };
                           });
                           const newPrizes = [...prizes];
                           newPrizes[idx].list = newList;
@@ -1400,7 +1400,7 @@ export default function App() {
                           prize.list.map(person => (
                             <div key={person.id} className="p-3 bg-slate-900/50 rounded-lg text-xs border border-slate-700/50 hover:border-slate-600 transition-colors">
                               <div className="font-semibold text-white">{person.name}</div>
-                              <div className="text-slate-400">{person.id} | {person.phone}</div>
+                              <div className="text-slate-400">{person.id}</div>
                             </div>
                           ))
                         )}

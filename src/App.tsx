@@ -625,7 +625,7 @@ export default function App() {
               } : {}}
             >
               <span className="text-lg">{prize.name}</span>
-              <div className="flex justify-between items-center opacity-70 text-xs">
+              <div className="flex justify-between items-center gap-4 opacity-70 text-xs">
                 <span>Số lượng: {prize.quantity}</span>
                 <span>Còn lại: {prize.remaining}</span>
               </div>

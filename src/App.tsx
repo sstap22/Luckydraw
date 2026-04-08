@@ -1007,7 +1007,7 @@ export default function App() {
                           className="w-full h-9 bg-transparent border-none cursor-pointer"
                         />
                       </div>
-                      <div className="w-20 space-y-2">
+                      <div className="w-20 space-y-2 flex-shrink-0">
                         <label className="text-xs text-slate-500">Số lượng</label>
                         <input 
                           type="number"
@@ -1022,7 +1022,7 @@ export default function App() {
                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"
                         />
                       </div>
-                      <div className="w-20 space-y-2">
+                      <div className="w-20 space-y-2 flex-shrink-0">
                         <label className="text-xs text-slate-500">Còn lại</label>
                         <input 
                           type="number"

@@ -493,18 +493,33 @@ export default function App() {
   };
 
   const handleSaveSettings = () => {
-    setSettings(tempSettings);
-    // Merge tempPrizes with existing prizes to preserve participant lists
-    setPrizes((prevPrizes: Prize[]) => 
-      tempPrizes.map((tempPrize: Prize) => {
-        const existingPrize = prevPrizes.find((p: Prize) => p.id === tempPrize.id);
+    // First, calculate the new prizes
+    const newPrizes = prizes.map(prize => {
+      const tempPrize = tempPrizes.find(tp => tp.id === prize.id);
+      if (tempPrize) {
         return {
           ...tempPrize,
-          list: existingPrize?.list || tempPrize.list || []
+          list: prize.list || tempPrize.list || []
         };
-      })
-    );
+      }
+      return prize;
+    });
+    
+    // Add any new prizes from tempPrizes that don't exist in prizes
+    tempPrizes.forEach(tempPrize => {
+      if (!newPrizes.find(p => p.id === tempPrize.id)) {
+        newPrizes.push(tempPrize);
+      }
+    });
+    
+    // Save to localStorage immediately
+    localStorage.setItem('lucky-draw-prizes', JSON.stringify(newPrizes));
+    
+    // Update state
+    setSettings(tempSettings);
+    setPrizes(newPrizes);
     setShowSettings(false);
+    
     // confetti for feedback
     confetti({
       particleCount: 50,

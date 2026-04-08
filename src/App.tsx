@@ -981,8 +981,8 @@ export default function App() {
                 </div>
                 <div className="space-y-3">
                   {tempPrizes.map((prize, idx) => (
-                    <div key={prize.id} className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 flex gap-4 items-end">
-                      <div className="flex-1 space-y-2">
+                    <div key={prize.id} className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 flex flex-wrap gap-4 items-end">
+                      <div className="flex-1 min-w-[180px] space-y-2">
                         <label className="text-xs text-slate-500">Tên giải</label>
                         <input 
                           value={prize.name}
@@ -994,7 +994,7 @@ export default function App() {
                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"
                         />
                       </div>
-                      <div className="w-16 space-y-2">
+                      <div className="w-20 space-y-2 flex-shrink-0">
                         <label className="text-xs text-slate-500">Màu</label>
                         <input 
                           type="color"
@@ -1007,7 +1007,7 @@ export default function App() {
                           className="w-full h-9 bg-transparent border-none cursor-pointer"
                         />
                       </div>
-                      <div className="w-20 space-y-2 flex-shrink-0">
+                      <div className="w-24 space-y-2 flex-shrink-0">
                         <label className="text-xs text-slate-500">Số lượng</label>
                         <input 
                           type="number"
@@ -1022,7 +1022,7 @@ export default function App() {
                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"
                         />
                       </div>
-                      <div className="w-20 space-y-2 flex-shrink-0 ml-4">
+                      <div className="w-24 space-y-2 flex-shrink-0 ml-8">
                         <label className="text-xs text-slate-500">Còn lại</label>
                         <input 
                           type="number"

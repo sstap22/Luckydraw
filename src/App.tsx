@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Settings, Trophy, Users, Play, RotateCcw, Trash2, Plus, X, ListChecks, Image as ImageIcon, Type as TypeIcon, Maximize, Download, AlertCircle, CheckCircle2, Info, Lock, Search } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { cn } from './lib/utils';
-import logoDefault from './Image/Logo/logo.png';
+import logoDefault from './Image/Logo/Logo SEVT.png';
 import heroDefault from './Image/Hero/hero.jpg';
 import spinSoundFile from './Sound/soundspin.mp3';
 
@@ -602,8 +602,8 @@ export default function App() {
       </header>
 
       <div className="flex flex-1 overflow-y-auto">
-        {/* Sidebar - Prize Selector (1/4 width) */}
-        <aside className="w-1/4 bg-transparent p-6 flex flex-col gap-4 overflow-y-auto border-r border-white/5">
+        {/* Sidebar - Prize Selector (1/5 width) */}
+        <aside className="w-1/5 bg-transparent p-6 flex flex-col gap-4 overflow-y-auto border-r border-white/5">
           <div className="flex items-center gap-2 mb-4">
             <Trophy className="text-yellow-500" size={20} />
             <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Danh sách giải</h2>
@@ -642,8 +642,8 @@ export default function App() {
           ))}
         </aside>
 
-        {/* Main Content (3/4 width) */}
-        <main className="w-3/4 flex flex-col items-center justify-start py-12 px-8 relative">
+        {/* Main Content (4/5 width) */}
+        <main className="w-4/5 flex flex-col items-center justify-start py-12 px-8 relative">
           {/* Display Area */}
           <div className="relative w-full max-w-4xl min-h-[650px] bg-gradient-to-b from-slate-800/80 to-slate-900/90 backdrop-blur-md rounded-[40px] border-4 border-slate-700/50 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-12 text-center transition-all duration-500">
             {/* Decorative elements */}
@@ -690,7 +690,7 @@ export default function App() {
                 >
                   {isConfirming && (
                     <div className="mb-4 inline-block px-6 py-2 bg-yellow-500 text-slate-900 font-black rounded-full animate-bounce uppercase tracking-widest text-sm">
-                      Chúc mừng người trúng giải!
+                      Chúc mừng bạn may mắn trúng {currentPrize?.name}!
                     </div>
                   )}
 
@@ -712,13 +712,6 @@ export default function App() {
                           <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">Họ và Tên</span>
                           <div className="text-4xl md:text-6xl font-black text-white drop-shadow-lg">
                             {displayPerson.name}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                          <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">Số điện thoại</span>
-                          <div className="text-3xl md:text-5xl font-semibold text-slate-300">
-                            {displayPerson.phone.replace(/(\d{3})(\d{3})(\d{4})/, '$1***$3')}
                           </div>
                         </div>
                       </motion.div>

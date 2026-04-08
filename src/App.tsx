@@ -736,14 +736,14 @@ export default function App() {
                   className="flex flex-col gap-6"
                 >
                   {isConfirming && (
-                    <div className="mb-4 inline-block px-6 py-2 bg-yellow-500 text-slate-900 font-black rounded-full animate-bounce uppercase tracking-widest text-2xl">
+                    <div className="mb-4 inline-block px-6 py-2 bg-yellow-500 text-slate-900 font-black rounded-full animate-bounce uppercase tracking-widest text-[1.35rem]">
                       Chúc mừng bạn may mắn trúng {currentPrize?.name}!
                     </div>
                   )}
 
                   <div className="flex flex-col gap-1">
                     <span className="text-slate-500 text-[1.5rem] font-bold uppercase tracking-widest leading-none">GEN</span>
-                    <div className="text-5xl md:text-7xl font-mono font-bold text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.3)]">
+                    <div className="text-[8rem] leading-none font-mono font-bold text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.3)]">
                       {displayPerson.id}
                     </div>
                   </div>

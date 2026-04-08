@@ -963,6 +963,17 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Spin Duration */}
+              <div className="space-y-3 pt-6 border-t border-slate-800">
+                <label className="text-sm font-medium text-slate-400">Thời gian quay (giây)</label>
+                <input 
+                  type="number" 
+                  value={tempSettings.spinDuration / 1000}
+                  onChange={(e) => setTempSettings({ ...tempSettings, spinDuration: Number(e.target.value) * 1000 })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                />
+              </div>
+
               {/* Prize Config */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center">

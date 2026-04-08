@@ -720,7 +720,7 @@ export default function App() {
                       key={displayPerson.id}
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 0.8, scale: 1.2 }}
-                      className="text-6xl font-mono font-bold text-yellow-400"
+                      className="text-[8rem] font-mono font-bold text-yellow-400"
                     >
                       {displayPerson.id}
                     </motion.div>

@@ -516,23 +516,13 @@ export default function App() {
   };
 
   const handleSaveSettings = () => {
-    // First, calculate the new prizes
-    const newPrizes = prizes.map(prize => {
-      const tempPrize = tempPrizes.find(tp => tp.id === prize.id);
-      if (tempPrize) {
-        return {
-          ...tempPrize,
-          list: prize.list || tempPrize.list || []
-        };
-      }
-      return prize;
-    });
-    
-    // Add any new prizes from tempPrizes that don't exist in prizes
-    tempPrizes.forEach(tempPrize => {
-      if (!newPrizes.find(p => p.id === tempPrize.id)) {
-        newPrizes.push(tempPrize);
-      }
+    // Use the edited temp list as the source of truth so deleted prizes stay deleted.
+    const newPrizes = tempPrizes.map(tempPrize => {
+      const existingPrize = prizes.find(prize => prize.id === tempPrize.id);
+      return {
+        ...tempPrize,
+        list: existingPrize?.list || tempPrize.list || []
+      };
     });
     
     // Save to localStorage immediately
@@ -542,6 +532,7 @@ export default function App() {
     // Update state
     setSettings(tempSettings);
     setPrizes(newPrizes);
+    setCurrentPrizeId(prev => (newPrizes.some(prize => prize.id === prev) ? prev : newPrizes[0]?.id || ''));
     setAllParticipants(Array.from(new Map<string, Participant>(tempAllParticipants.map(p => [p.id, p])).values()));
     setShowSettings(false);
     

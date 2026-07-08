@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Trophy, Users, Play, RotateCcw, Trash2, Plus, X, ListChecks, Image as ImageIcon, Type as TypeIcon, Maximize, Download, AlertCircle, CheckCircle2, Info, Lock, Search } from 'lucide-react';
+import { Settings, Trophy, Users, Play, RotateCcw, Trash2, Plus, X, ListChecks, Image as ImageIcon, Type as TypeIcon, Maximize, Download, AlertCircle, CheckCircle2, Info, Lock, Search, Save } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { cn } from './lib/utils';
 import logoDefault from './Image/Logo/Logo SEVT.png';
@@ -32,8 +32,17 @@ interface AppSettings {
   titleSize: number;
   titleFont: string;
   logoUrl: string;
+  logoFileName: string;
   logoSize: number;
   bgUrl: string;
+  bgFileName: string;
+  spinSoundUrl: string;
+  spinSoundFileName: string;
+  koreanSpinLabel: string;
+  koreanConfirmLabel: string;
+  koreanBackLabel: string;
+  koreanLabelColor: string;
+  koreanLabelSize: number;
   spinDuration: number;
 }
 
@@ -43,8 +52,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   titleSize: 48,
   titleFont: 'Inter',
   logoUrl: logoDefault,
+  logoFileName: '',
   logoSize: 60,
   bgUrl: heroDefault,
+  bgFileName: '',
+  spinSoundUrl: spinSoundFile,
+  spinSoundFileName: '',
+  koreanSpinLabel: '추첨하기',
+  koreanConfirmLabel: '확인',
+  koreanBackLabel: '재추첨',
+  koreanLabelColor: '#94a3b8',
+  koreanLabelSize: 12,
   spinDuration: 3000,
 };
 
@@ -106,11 +124,21 @@ export default function App() {
       // Reset to defaults if saved values are not base64 data (i.e., they are old image paths)
       const logoUrl = parsed.logoUrl?.startsWith('data:') ? parsed.logoUrl : logoDefault;
       const bgUrl = parsed.bgUrl?.startsWith('data:') ? parsed.bgUrl : heroDefault;
+      const spinSoundUrl = parsed.spinSoundUrl?.startsWith('data:audio') ? parsed.spinSoundUrl : spinSoundFile;
       return {
         ...DEFAULT_SETTINGS,
         ...parsed,
         logoUrl,
+        logoFileName: parsed.logoFileName || '',
         bgUrl,
+        bgFileName: parsed.bgFileName || '',
+        spinSoundUrl,
+        spinSoundFileName: parsed.spinSoundFileName || '',
+        koreanSpinLabel: parsed.koreanSpinLabel || DEFAULT_SETTINGS.koreanSpinLabel,
+        koreanConfirmLabel: parsed.koreanConfirmLabel || DEFAULT_SETTINGS.koreanConfirmLabel,
+        koreanBackLabel: parsed.koreanBackLabel || DEFAULT_SETTINGS.koreanBackLabel,
+        koreanLabelColor: parsed.koreanLabelColor || DEFAULT_SETTINGS.koreanLabelColor,
+        koreanLabelSize: typeof parsed.koreanLabelSize === 'number' ? parsed.koreanLabelSize : DEFAULT_SETTINGS.koreanLabelSize,
       };
     }
     return DEFAULT_SETTINGS;
@@ -131,12 +159,14 @@ export default function App() {
   const [winnerSearchQuery, setWinnerSearchQuery] = useState('');
   const [showParticipants, setShowParticipants] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
-  const [adminPasswordVerified, setAdminPasswordVerified] = useState(false);
+  const [koreanSettingsUnlocked, setKoreanSettingsUnlocked] = useState(false);
   const [participantSearchQuery, setParticipantSearchQuery] = useState('');
   const [passwordModalType, setPasswordModalType] = useState<'delete' | 'admin' | null>(null);
+  const [participantDrafts, setParticipantDrafts] = useState<Record<string, string>>({});
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const spinAudioRef = useRef<HTMLAudioElement | null>(null);
+  const spinAudioSourceRef = useRef<string>('');
 
   const getAudioContext = useCallback(() => {
     if (typeof window === 'undefined') return null;
@@ -173,11 +203,18 @@ export default function App() {
     const context = await ensureAudioReady();
     if (!context) return;
 
+    const desiredSpinSound = settings.spinSoundUrl || spinSoundFile;
+
     if (!spinAudioRef.current) {
-      spinAudioRef.current = new Audio(spinSoundFile);
+      spinAudioRef.current = new Audio(desiredSpinSound);
       spinAudioRef.current.preload = 'auto';
       spinAudioRef.current.loop = true;
       spinAudioRef.current.volume = 0.95;
+      spinAudioSourceRef.current = desiredSpinSound;
+    } else if (spinAudioSourceRef.current !== desiredSpinSound) {
+      spinAudioRef.current.src = desiredSpinSound;
+      spinAudioRef.current.load();
+      spinAudioSourceRef.current = desiredSpinSound;
     }
 
     spinAudioRef.current.currentTime = 0;
@@ -188,7 +225,7 @@ export default function App() {
         spinAudioRef.current?.play().catch(() => {});
       });
     }
-  }, [ensureAudioReady, stopSpinSound]);
+  }, [ensureAudioReady, settings.spinSoundUrl, stopSpinSound]);
 
   const playWinSound = useCallback(async () => {
     const context = await ensureAudioReady();
@@ -321,6 +358,7 @@ export default function App() {
       setTempSettings(settings);
       setTempPrizes(prizes);
       setTempAllParticipants(allParticipants);
+      setKoreanSettingsUnlocked(false);
     }
   }, [showSettings, settings, prizes, allParticipants]);
 
@@ -339,6 +377,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('lucky-draw-all-participants', JSON.stringify(allParticipants));
   }, [allParticipants]);
+
+  useEffect(() => {
+    if (!showParticipants) return;
+
+    const initialDrafts = prizes.reduce<Record<string, string>>((acc, prize) => {
+      acc[prize.id] = prize.list.map((p) => `${p.name},${p.id}`).join('\n');
+      return acc;
+    }, {});
+
+    setParticipantDrafts(initialDrafts);
+  }, [showParticipants, prizes]);
 
   const currentPrizeIndex = prizes.findIndex(p => p.id === currentPrizeId);
   const currentPrize = prizes[currentPrizeIndex];
@@ -478,8 +527,11 @@ export default function App() {
       }
     } else if (passwordModalType === 'admin') {
       if (adminPasswordInput.trim() === 'tap') {
-        setAdminPasswordVerified(true);
-        setShowParticipants(true);
+        if (showSettings && !showParticipants) {
+          setKoreanSettingsUnlocked(true);
+        } else {
+          setShowParticipants(true);
+        }
         setAdminPasswordInput('');
         setShowPasswordModal(false);
         setPasswordModalType(null);
@@ -491,15 +543,37 @@ export default function App() {
   };
 
   const handleOpenParticipants = () => {
-    if (adminPasswordVerified) {
-      setShowParticipants(true);
-    } else {
-      setPasswordModalType('admin');
-      setShowPasswordModal(true);
-    }
+    setAdminPasswordInput('');
+    setPasswordModalType('admin');
+    setShowPasswordModal(true);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'bg') => {
+  const handleUnlockKoreanSettings = () => {
+    setAdminPasswordInput('');
+    setPasswordModalType('admin');
+    setShowPasswordModal(true);
+  };
+
+  const handleSaveParticipants = () => {
+    const updatedPrizes = prizes.map((prize) => {
+      const draft = participantDrafts[prize.id] ?? '';
+      const lines = draft.split('\n').filter((line) => line.trim());
+      const parsedList = lines.map((line) => {
+        const [name, id] = line.split(',').map((value) => value.trim());
+        return { name: name || 'N/A', id: id || 'N/A' };
+      });
+
+      return {
+        ...prize,
+        list: parsedList,
+      };
+    });
+
+    setPrizes(updatedPrizes);
+    showNotification('Đã lưu danh sách người tham gia!', 'success');
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'bg' | 'spinSound') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -507,9 +581,11 @@ export default function App() {
     reader.onloadend = () => {
       const base64String = reader.result as string;
       if (type === 'logo') {
-        setTempSettings(prev => ({ ...prev, logoUrl: base64String }));
+        setTempSettings(prev => ({ ...prev, logoUrl: base64String, logoFileName: file.name }));
+      } else if (type === 'bg') {
+        setTempSettings(prev => ({ ...prev, bgUrl: base64String, bgFileName: file.name }));
       } else {
-        setTempSettings(prev => ({ ...prev, bgUrl: base64String }));
+        setTempSettings(prev => ({ ...prev, spinSoundUrl: base64String, spinSoundFileName: file.name }));
       }
     };
     reader.readAsDataURL(file);
@@ -758,20 +834,36 @@ export default function App() {
 
                   {isConfirming && showFullInfo && (
                     <div className="mt-8 flex gap-4 justify-center">
-                      <button
-                        onClick={handleCancelWinner}
-                        className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold flex items-center gap-2 transition-all active:scale-95 border border-white/10"
-                      >
-                        <RotateCcw size={20} />
-                        Quay lại
-                      </button>
-                      <button
-                        onClick={handleConfirmWinner}
-                        className="px-8 py-4 bg-green-500 hover:bg-green-400 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-green-500/20 transition-all active:scale-95"
-                      >
-                        <CheckCircle2 size={20} />
-                        Xác nhận
-                      </button>
+                      <div className="flex flex-col items-center gap-2">
+                        <button
+                          onClick={handleCancelWinner}
+                          className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold flex items-center gap-2 transition-all active:scale-95 border border-white/10"
+                        >
+                          <RotateCcw size={20} />
+                          Quay lại
+                        </button>
+                        <div
+                          className="italic leading-none"
+                          style={{ color: settings.koreanLabelColor, fontSize: `${settings.koreanLabelSize}px` }}
+                        >
+                          {settings.koreanBackLabel}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <button
+                          onClick={handleConfirmWinner}
+                          className="px-8 py-4 bg-green-500 hover:bg-green-400 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-green-500/20 transition-all active:scale-95"
+                        >
+                          <CheckCircle2 size={20} />
+                          Xác nhận
+                        </button>
+                        <div
+                          className="italic leading-none"
+                          style={{ color: settings.koreanLabelColor, fontSize: `${settings.koreanLabelSize}px` }}
+                        >
+                          {settings.koreanConfirmLabel}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </motion.div>
@@ -793,35 +885,43 @@ export default function App() {
           {/* Spin Button */}
           <div className="mt-12">
             {!isConfirming && (
-              <button
-                onClick={startSpin}
-                disabled={isSpinning}
-                className={cn(
-                  "group relative px-20 py-8 rounded-full text-3xl font-black uppercase tracking-widest transition-all duration-500 overflow-hidden",
-                  isSpinning 
-                    ? "bg-slate-800 text-slate-600 cursor-not-allowed" 
-                    : (availableParticipants.length === 0 || (currentPrize && currentPrize.remaining <= 0))
-                      ? "bg-slate-700 text-slate-400 hover:bg-slate-600"
-                      : "bg-yellow-500 text-slate-900 hover:scale-110 hover:shadow-2xl hover:shadow-yellow-500/40 active:scale-95"
-                )}
-              >
-                <span className="relative z-10 flex items-center gap-4">
-                  {isSpinning ? (
-                    <>
-                      <RotateCcw className="animate-spin" size={32} />
-                      Đang quay...
-                    </>
-                  ) : (
-                    <>
-                      <Play fill="currentColor" size={32} />
-                      Quay số
-                    </>
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  onClick={startSpin}
+                  disabled={isSpinning}
+                  className={cn(
+                    "group relative px-20 py-8 rounded-full text-3xl font-black uppercase tracking-widest transition-all duration-500 overflow-hidden",
+                    isSpinning 
+                      ? "bg-slate-800 text-slate-600 cursor-not-allowed" 
+                      : (availableParticipants.length === 0 || (currentPrize && currentPrize.remaining <= 0))
+                        ? "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                        : "bg-yellow-500 text-slate-900 hover:scale-110 hover:shadow-2xl hover:shadow-yellow-500/40 active:scale-95"
                   )}
-                </span>
-                {!isSpinning && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
-                )}
-              </button>
+                >
+                  <span className="relative z-10 flex items-center gap-4">
+                    {isSpinning ? (
+                      <>
+                        <RotateCcw className="animate-spin" size={32} />
+                        Đang quay...
+                      </>
+                    ) : (
+                      <>
+                        <Play fill="currentColor" size={32} />
+                        Quay số
+                      </>
+                    )}
+                  </span>
+                  {!isSpinning && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
+                  )}
+                </button>
+                  <div
+                    className="italic leading-none"
+                    style={{ color: settings.koreanLabelColor, fontSize: `${settings.koreanLabelSize}px` }}
+                  >
+                    {settings.koreanSpinLabel}
+                  </div>
+              </div>
             )}
           </div>
         </main>
@@ -948,13 +1048,16 @@ export default function App() {
                       </label>
                       {tempSettings.logoUrl && (
                         <button 
-                          onClick={() => setTempSettings({ ...tempSettings, logoUrl: logoDefault })}
+                          onClick={() => setTempSettings({ ...tempSettings, logoUrl: logoDefault, logoFileName: '' })}
                           className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"
                         >
                           <Trash2 size={18} />
                         </button>
                       )}
                     </div>
+                    <p className="text-[11px] text-slate-500/60 italic truncate">
+                      Đang dùng: {tempSettings.logoFileName || 'Logo mặc định'}
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs text-slate-500 flex items-center gap-2">
@@ -983,12 +1086,116 @@ export default function App() {
                       </label>
                       {tempSettings.bgUrl && (
                         <button 
-                          onClick={() => setTempSettings({ ...tempSettings, bgUrl: heroDefault })}
+                          onClick={() => setTempSettings({ ...tempSettings, bgUrl: heroDefault, bgFileName: '' })}
                           className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"
                         >
                           <Trash2 size={18} />
                         </button>
                       )}
+                    </div>
+                    <p className="text-[11px] text-slate-500/60 italic truncate">
+                      Đang dùng: {tempSettings.bgFileName || 'Hình nền mặc định'}
+                    </p>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <label className="text-xs text-slate-500 flex items-center gap-2">
+                      <Play size={14} /> Nhạc nền quay số (MP3/WAV/OGG)
+                    </label>
+                    <div className="flex gap-3">
+                      <label className="flex-1 cursor-pointer bg-slate-800 border border-slate-700 hover:border-yellow-500/50 rounded-lg px-4 py-2 text-sm text-slate-400 flex items-center justify-center gap-2 transition-all">
+                        <Plus size={16} /> Chọn tệp âm thanh từ thiết bị
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          className="hidden"
+                          onChange={(e) => handleFileUpload(e, 'spinSound')}
+                        />
+                      </label>
+                      <button
+                        onClick={() => setTempSettings({ ...tempSettings, spinSoundUrl: spinSoundFile, spinSoundFileName: '' })}
+                        className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"
+                        title="Khôi phục nhạc nền mặc định"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-500/60 italic truncate">
+                      Đang dùng: {tempSettings.spinSoundFileName || 'Nhạc nền mặc định'}
+                    </p>
+                  </div>
+
+                  <div className="col-span-2 space-y-3 pt-4 border-t border-slate-700/70">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs text-slate-500 flex items-center gap-2">
+                        <Lock size={14} /> Chữ Hàn dưới nút
+                      </label>
+                      {!koreanSettingsUnlocked && (
+                        <button
+                          onClick={handleUnlockKoreanSettings}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-800 border border-slate-700 hover:border-blue-500/60 text-slate-300"
+                        >
+                          Mở khóa bằng mật khẩu admin
+                        </button>
+                      )}
+                    </div>
+
+                    <div className={cn("space-y-3", !koreanSettingsUnlocked && "opacity-50 pointer-events-none") }>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-2">
+                          <label className="text-[11px] text-slate-500">Quay số</label>
+                          <input
+                            value={tempSettings.koreanSpinLabel}
+                            onChange={(e) => setTempSettings({ ...tempSettings, koreanSpinLabel: e.target.value })}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[11px] text-slate-500">Xác nhận</label>
+                          <input
+                            value={tempSettings.koreanConfirmLabel}
+                            onChange={(e) => setTempSettings({ ...tempSettings, koreanConfirmLabel: e.target.value })}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[11px] text-slate-500">Quay lại</label>
+                          <input
+                            value={tempSettings.koreanBackLabel}
+                            onChange={(e) => setTempSettings({ ...tempSettings, koreanBackLabel: e.target.value })}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <label className="text-[11px] text-slate-500">Màu chữ</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={tempSettings.koreanLabelColor}
+                              onChange={(e) => setTempSettings({ ...tempSettings, koreanLabelColor: e.target.value })}
+                              className="w-10 h-10 bg-transparent border-none cursor-pointer"
+                            />
+                            <input
+                              value={tempSettings.koreanLabelColor}
+                              onChange={(e) => setTempSettings({ ...tempSettings, koreanLabelColor: e.target.value })}
+                              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[11px] text-slate-500">Cỡ chữ (px)</label>
+                          <input
+                            type="number"
+                            min={8}
+                            max={24}
+                            value={tempSettings.koreanLabelSize}
+                            onChange={(e) => setTempSettings({ ...tempSettings, koreanLabelSize: Number(e.target.value) })}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1344,7 +1551,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Participants Modal */}
-      {showParticipants && adminPasswordVerified && (
+      {showParticipants && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex flex-col">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -1361,15 +1568,24 @@ export default function App() {
                   <p className="text-slate-400">Tổng cộng {prizes.reduce((sum, p) => sum + p.list.length, 0)} người</p>
                 </div>
               </div>
-              <button 
-                onClick={() => {
-                  setShowParticipants(false);
-                  setParticipantSearchQuery('');
-                }} 
-                className="p-4 hover:bg-white/10 rounded-2xl transition-all text-white/70 hover:text-white bg-white/5 border border-white/10"
-              >
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveParticipants}
+                  className="p-4 hover:bg-green-500/20 rounded-2xl transition-all text-white/70 hover:text-green-400 bg-white/5 border border-white/10"
+                  title="Lưu danh sách"
+                >
+                  <Save size={24} />
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowParticipants(false);
+                    setParticipantSearchQuery('');
+                  }} 
+                  className="p-4 hover:bg-white/10 rounded-2xl transition-all text-white/70 hover:text-white bg-white/5 border border-white/10"
+                >
+                  <X size={24} />
+                </button>
+              </div>
             </div>
             
             <div className="flex-1 overflow-x-auto p-8 bg-transparent">
@@ -1388,16 +1604,13 @@ export default function App() {
                       <textarea 
                         rows={4}
                         placeholder="Nguyễn Văn A,A001"
-                        defaultValue={prize.list.map(p => `${p.name},${p.id}`).join('\n')}
-                        onBlur={(e) => {
-                          const lines = e.target.value.split('\n').filter(l => l.trim());
-                          const newList = lines.map(line => {
-                            const [name, id] = line.split(',').map(s => s.trim());
-                            return { name: name || 'N/A', id: id || 'N/A' };
-                          });
-                          const newPrizes = [...prizes];
-                          newPrizes[idx].list = newList;
-                          setPrizes(newPrizes);
+                        value={participantDrafts[prize.id] ?? ''}
+                        onChange={(e) => {
+                          const nextValue = e.target.value;
+                          setParticipantDrafts((prev) => ({
+                            ...prev,
+                            [prize.id]: nextValue,
+                          }));
                         }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-yellow-500"
                       />

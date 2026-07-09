@@ -17,6 +17,11 @@ interface Participant {
   name: string;
 }
 
+const makeParticipantKey = (participant: Participant) => `${participant.id.trim()}__${participant.name.trim()}`;
+
+const uniqueParticipants = (participants: Participant[]) =>
+  Array.from(new Map<string, Participant>(participants.map(participant => [makeParticipantKey(participant), participant])).values());
+
 interface Prize {
   id: string;
   name: string;
@@ -103,7 +108,7 @@ export default function App() {
       const parsed = JSON.parse(saved);
       return parsed.map((p: Prize) => ({
         ...p,
-        list: p.list && p.list.length > 0 ? p.list : (SAMPLE_PARTICIPANTS[p.id] || [])
+        list: p.list && p.list.length > 0 ? uniqueParticipants(p.list) : (SAMPLE_PARTICIPANTS[p.id] || [])
       }));
     }
     return DEFAULT_PRIZES.map(p => ({
@@ -153,7 +158,7 @@ export default function App() {
   const [showFullInfo, setShowFullInfo] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
-  const [deleteWinnerTarget, setDeleteWinnerTarget] = useState<{ prizeId: string; personId: string } | null>(null);
+  const [deleteWinnerTarget, setDeleteWinnerTarget] = useState<{ prizeId: string; personId: string; personName: string } | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [winnerSearchQuery, setWinnerSearchQuery] = useState('');
@@ -167,6 +172,8 @@ export default function App() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const spinAudioRef = useRef<HTMLAudioElement | null>(null);
   const spinAudioSourceRef = useRef<string>('');
+  const pendingWinnerRef = useRef<Participant | null>(null);
+  const spinEndTimeRef = useRef<number | null>(null);
 
   const getAudioContext = useCallback(() => {
     if (typeof window === 'undefined') return null;
@@ -332,10 +339,10 @@ export default function App() {
       const saved = localStorage.getItem('lucky-draw-all-participants');
       if (saved) {
         const parsed = JSON.parse(saved) as Participant[];
-        return Array.from(new Map<string, Participant>(parsed.map(p => [p.id, p])).values());
+        return uniqueParticipants(parsed);
       }
 
-      return Array.from(new Map<string, Participant>(prizes.flatMap(p => p.list).map(p => [p.id, p])).values());
+      return uniqueParticipants(prizes.flatMap(p => p.list));
     })()
   );
   const [allParticipants, setAllParticipants] = useState<Participant[]>(() => 
@@ -343,10 +350,10 @@ export default function App() {
       const saved = localStorage.getItem('lucky-draw-all-participants');
       if (saved) {
         const parsed = JSON.parse(saved) as Participant[];
-        return Array.from(new Map<string, Participant>(parsed.map(p => [p.id, p])).values());
+        return uniqueParticipants(parsed);
       }
 
-      return Array.from(new Map<string, Participant>(prizes.flatMap(p => p.list).map(p => [p.id, p])).values());
+      return uniqueParticipants(prizes.flatMap(p => p.list));
     })()
   );
 
@@ -391,15 +398,24 @@ export default function App() {
 
   const currentPrizeIndex = prizes.findIndex(p => p.id === currentPrizeId);
   const currentPrize = prizes[currentPrizeIndex];
+
+  const totalPrizeSlotsSetup = tempPrizes.reduce((sum: number, prize: Prize) => sum + prize.quantity, 0);
+  const totalPrizeSlotsDrawn = winners.length;
   
   // Logic: Prize at index i includes participants from lists 0 to i
   const cumulativeList = prizes
     .slice(0, currentPrizeIndex + 1)
-    .reduce((acc: Participant[], prize: Prize) => [...acc, ...prize.list], [] as Participant[]);
+    .reduce((acc: Participant[], prize: Prize, index: number) => {
+      if (index < currentPrizeIndex && prize.list.length === 1) {
+        return acc;
+      }
+
+      return [...acc, ...prize.list];
+    }, [] as Participant[]);
   
   // Remove duplicates (by ID) and filter out winners
-  const availableParticipants: Participant[] = Array.from(new Map<string, Participant>(cumulativeList.map(p => [p.id, p])).values())
-    .filter(p => !winners.some(w => w.person.id === p.id));
+  const availableParticipants: Participant[] = uniqueParticipants(cumulativeList)
+    .filter(p => !winners.some(w => makeParticipantKey(w.person) === makeParticipantKey(p)));
 
   // All participants for display (remove duplicates)
   const displayParticipants: Participant[] = allParticipants;
@@ -417,6 +433,10 @@ export default function App() {
       return;
     }
 
+    const winner = availableParticipants[Math.floor(Math.random() * availableParticipants.length)];
+    pendingWinnerRef.current = winner;
+    spinEndTimeRef.current = Date.now() + settings.spinDuration;
+
     setIsSpinning(true);
     setIsConfirming(false);
     setShowFullInfo(false);
@@ -425,6 +445,14 @@ export default function App() {
     
     // Shuffle animation
     spinIntervalRef.current = window.setInterval(() => {
+      const endTime = spinEndTimeRef.current;
+      const pendingWinner = pendingWinnerRef.current;
+
+      if (pendingWinner && endTime && Date.now() >= endTime - 150) {
+        setDisplayPerson(pendingWinner);
+        return;
+      }
+
       const randomIndex = Math.floor(Math.random() * displayParticipants.length);
       setDisplayPerson(displayParticipants[randomIndex]);
     }, 40); // Faster spin
@@ -438,8 +466,8 @@ export default function App() {
 
       // Play win sound
       void playWinSound();
-      
-      const winner = availableParticipants[Math.floor(Math.random() * availableParticipants.length)];
+
+      const winner = pendingWinnerRef.current || availableParticipants[Math.floor(Math.random() * availableParticipants.length)];
       setDisplayPerson(winner);
       setIsSpinning(false);
       setIsConfirming(true);
@@ -448,6 +476,9 @@ export default function App() {
       setTimeout(() => {
         setShowFullInfo(true);
       }, 1000);
+
+      pendingWinnerRef.current = null;
+      spinEndTimeRef.current = null;
       
       // Celebrate
       confetti({
@@ -457,7 +488,7 @@ export default function App() {
         colors: ['#FFD700', '#FFA500', '#FF4500', '#FFFFFF']
       });
     }, settings.spinDuration);
-  }, [isSpinning, availableParticipants, currentPrize, currentPrizeId, settings.spinDuration, playSpinSound, playWinSound, stopSpinSound]);
+  }, [isSpinning, availableParticipants, currentPrize, settings.spinDuration, playSpinSound, playWinSound, stopSpinSound]);
 
   const handleConfirmWinner = () => {
     if (!displayPerson || !currentPrizeId) return;
@@ -494,8 +525,8 @@ export default function App() {
     setShowPasswordModal(true);
   };
 
-  const handleDeleteWinner = (prizeId: string, personId: string) => {
-    setDeleteWinnerTarget({ prizeId, personId });
+  const handleDeleteWinner = (prizeId: string, personId: string, personName: string) => {
+    setDeleteWinnerTarget({ prizeId, personId, personName });
     setPasswordModalType('delete');
     setShowPasswordModal(true);
   };
@@ -505,8 +536,8 @@ export default function App() {
       if (passwordInput.trim() === 'tap') {
         if (deleteWinnerTarget) {
           // Delete single winner
-          const { prizeId, personId } = deleteWinnerTarget;
-          setWinners(prev => prev.filter(w => !(w.prizeId === prizeId && w.person.id === personId)));
+          const { prizeId, personId, personName } = deleteWinnerTarget;
+          setWinners(prev => prev.filter(w => !(w.prizeId === prizeId && w.person.id === personId && w.person.name === personName)));
           setPrizes(prev => prev.map(p => p.id === prizeId ? { ...p, remaining: p.remaining + 1 } : p));
           setDeleteWinnerTarget(null);
           showNotification('Đã xóa người trúng giải này!', 'success');
@@ -609,7 +640,7 @@ export default function App() {
     setSettings(tempSettings);
     setPrizes(newPrizes);
     setCurrentPrizeId(prev => (newPrizes.some(prize => prize.id === prev) ? prev : newPrizes[0]?.id || ''));
-    setAllParticipants(Array.from(new Map<string, Participant>(tempAllParticipants.map(p => [p.id, p])).values()));
+    setAllParticipants(uniqueParticipants(tempAllParticipants));
     setShowSettings(false);
     
     // confetti for feedback
@@ -959,7 +990,7 @@ export default function App() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-yellow-500 uppercase">Tất cả người tham gia</span>
-                    <span className="text-[10px] text-slate-500">{tempAllParticipants.length} người</span>
+                    <span className="text-[10px] text-slate-500">{uniqueParticipants(tempAllParticipants).length} người</span>
                   </div>
                   <textarea 
                     rows={6}
@@ -971,7 +1002,7 @@ export default function App() {
                         const [name, id] = line.split(',').map(s => s.trim());
                         return { name: name || 'N/A', id: id || 'N/A' };
                       });
-                      setTempAllParticipants(newList);
+                      setTempAllParticipants(uniqueParticipants(newList));
                     }}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-yellow-500"
                   />
@@ -1214,8 +1245,10 @@ export default function App() {
 
               {/* Prize Config */}
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium text-slate-400">Cấu hình giải thưởng</label>
+                <div className="flex justify-between items-center gap-4 flex-wrap">
+                  <label className="text-sm font-medium text-slate-400">
+                    Cấu hình giải thưởng ({totalPrizeSlotsDrawn}/{totalPrizeSlotsSetup} giải đã quay / tổng số giải setup)
+                  </label>
                 </div>
                 <div className="space-y-3">
                   {tempPrizes.map((prize, idx) => (
@@ -1426,7 +1459,7 @@ export default function App() {
                                     #{i + 1}
                                   </div>
                                   <button 
-                                    onClick={() => handleDeleteWinner(w.prizeId, w.person.id)}
+                                    onClick={() => handleDeleteWinner(w.prizeId, w.person.id, w.person.name)}
                                     className="p-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-md transition-all opacity-0 group-hover:opacity-100"
                                     title="Xóa người này"
                                   >

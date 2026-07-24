@@ -68,7 +68,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   koreanBackLabel: '재추첨',
   koreanLabelColor: '#94a3b8',
   koreanLabelSize: 12,
-  spinDuration: 3000,
+  spinDuration: 9000,
 };
 
 const DEFAULT_PRIZES: Prize[] = [
@@ -455,16 +455,16 @@ export default function App() {
       const remaining = endTime - Date.now();
       let nextDelay = 40;
 
-      if (remaining <= 1500) {
-        // GDD4: lock winner for the final 1500ms
+      if (remaining <= 1200) {
+        // GDD4: lock winner for the final 1200ms
         setDisplayPerson(pendingWinner);
-        nextDelay = 1500;
-      } else if (remaining <= 2000) {
+        nextDelay = 1200;
+      } else if (remaining <= 3000) {
         // GDD3: slow down to ~3 updates per second
         const randomIndex = Math.floor(Math.random() * displayParticipants.length);
         setDisplayPerson(displayParticipants[randomIndex]);
         nextDelay = 333;
-      } else if (remaining <= 3000) {
+      } else if (remaining <= 5000) {
         // GDD2: slow down to ~6 updates per second
         const randomIndex = Math.floor(Math.random() * displayParticipants.length);
         setDisplayPerson(displayParticipants[randomIndex]);

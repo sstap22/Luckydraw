@@ -403,23 +403,24 @@ export default function App() {
   const totalPrizeSlotsSetup = tempPrizes.reduce((sum: number, prize: Prize) => sum + prize.quantity, 0);
   const totalPrizeSlotsDrawn = winners.length;
   
-  // Logic: Prize at index i includes participants from lists 0 to i
-  const cumulativeList = prizes
-    .slice(0, currentPrizeIndex + 1)
-    .reduce((acc: Participant[], prize: Prize, index: number) => {
-      if (index < currentPrizeIndex && prize.list.length === 1) {
-        return acc;
-      }
+  // Master pool combining all entered participants across all prizes & settings
+  const masterPool = uniqueParticipants([
+    ...allParticipants,
+    ...prizes.flatMap(p => p.list)
+  ]);
 
-      return [...acc, ...prize.list];
-    }, [] as Participant[]);
-  
-  // Remove duplicates (by ID) and filter out winners
-  const availableParticipants: Participant[] = uniqueParticipants(cumulativeList)
+  // Logic: If current prize has its own non-empty list, use that list;
+  // otherwise fallback to using all entered participants (masterPool)
+  const basePrizeList = (currentPrize && currentPrize.list.length > 0)
+    ? currentPrize.list
+    : masterPool;
+
+  // Filter out any participants who have already won a prize
+  const availableParticipants: Participant[] = uniqueParticipants(basePrizeList)
     .filter(p => !winners.some(w => makeParticipantKey(w.person) === makeParticipantKey(p)));
 
-  // All participants for display (remove duplicates)
-  const displayParticipants: Participant[] = allParticipants;
+  // All participants for display animation
+  const displayParticipants: Participant[] = masterPool.length > 0 ? masterPool : allParticipants;
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });

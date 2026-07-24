@@ -409,23 +409,12 @@ export default function App() {
     ...prizes.flatMap(p => p.list)
   ]);
 
-  // Accumulated participant lists from previous prizes (before current prize)
-  const previousAccumulatedList = prizes
-    .slice(0, currentPrizeIndex > 0 ? currentPrizeIndex : 0)
-    .flatMap(p => p.list);
-
-  // Fallback pool for prizes without assigned lists:
-  // Use accumulated previous prize lists if available, otherwise use masterPool / allParticipants
-  const fallbackPool = previousAccumulatedList.length > 0
-    ? uniqueParticipants(previousAccumulatedList)
-    : (masterPool.length > 0 ? masterPool : allParticipants);
-
   // Base list for current prize:
-  // If current prize HAS an assigned list (length > 0), use ITS assigned list!
-  // If current prize DOES NOT have an assigned list (length === 0), use fallbackPool!
+  // 1. If current prize HAS an assigned list (length > 0), use ITS assigned list!
+  // 2. If current prize DOES NOT have an assigned list (length === 0), use allParticipants / masterPool!
   const basePrizeList = (currentPrize && currentPrize.list.length > 0)
     ? currentPrize.list
-    : fallbackPool;
+    : (allParticipants.length > 0 ? allParticipants : masterPool);
 
   // Filter out any participants who have already won a prize
   const availableParticipants: Participant[] = uniqueParticipants(basePrizeList)

@@ -79,29 +79,6 @@ const DEFAULT_PRIZES: Prize[] = [
   { id: 'E', name: 'Tiểu Long', quantity: 1, remaining: 1, list: [], color: '#22C55E' },
 ];
 
-const SAMPLE_PARTICIPANTS: Record<string, Participant[]> = {
-  A: [
-    { id: 'A001', name: 'Nguyễn Văn A' },
-    { id: 'A002', name: 'Trần Thị B' },
-  ],
-  B: [
-    { id: 'B001', name: 'Lê Văn C' },
-    { id: 'B002', name: 'Phạm Thị D' },
-    { id: 'B003', name: 'Hoàng Văn E' },
-    { id: 'B004', name: 'Đặng Thị F' },
-  ],
-  C: [
-    { id: 'C001', name: 'Bùi Văn G' },
-    { id: 'C002', name: 'Vũ Thị H' },
-    { id: 'C003', name: 'Đỗ Văn I' },
-    { id: 'C004', name: 'Ngô Thị K' },
-  ],
-  D: Array.from({ length: 20 }, (_, i) => ({
-    id: `D${String(i + 1).padStart(3, '0')}`,
-    name: `Người dùng D${i + 1}`,
-  })),
-};
-
 export default function App() {
   const [prizes, setPrizes] = useState<Prize[]>(() => {
     const saved = localStorage.getItem('lucky-draw-prizes');
@@ -109,12 +86,12 @@ export default function App() {
       const parsed = JSON.parse(saved);
       return parsed.map((p: Prize) => ({
         ...p,
-        list: p.list && p.list.length > 0 ? uniqueParticipants(p.list) : (SAMPLE_PARTICIPANTS[p.id] || [])
+        list: p.list && p.list.length > 0 ? uniqueParticipants(p.list) : []
       }));
     }
     return DEFAULT_PRIZES.map(p => ({
       ...p,
-      list: SAMPLE_PARTICIPANTS[p.id] || []
+      list: []
     }));
   });
 
@@ -411,10 +388,36 @@ export default function App() {
 
   // Base list for current prize:
   // 1. If current prize HAS an assigned list (length > 0), use ITS assigned list!
-  // 2. If current prize DOES NOT have an assigned list (length === 0), use allParticipants / masterPool!
-  const basePrizeList = (currentPrize && currentPrize.list.length > 0)
-    ? currentPrize.list
-    : (allParticipants.length > 0 ? allParticipants : masterPool);
+  // 2. If current prize DOES NOT have an assigned list (length === 0):
+  //    Check each prize p with an assigned list:
+  //    Only include prize p's list if (pRemainingEligibleCount > p.remaining).
+  //    If no prize qualifies, fallback to allParticipants / masterPool.
+  let basePrizeList: Participant[] = [];
+
+  if (currentPrize && currentPrize.list.length > 0) {
+    basePrizeList = currentPrize.list;
+  } else {
+    const qualifiedPool: Participant[] = [];
+
+    prizes.forEach((p) => {
+      if (p.list.length > 0) {
+        // Remaining eligible people in prize p (not won yet)
+        const pEligible = p.list.filter(
+          (person) => !winners.some((w) => makeParticipantKey(w.person) === makeParticipantKey(person))
+        );
+        // Only include if remaining eligible people > remaining prize slots
+        if (pEligible.length > p.remaining) {
+          qualifiedPool.push(...pEligible);
+        }
+      }
+    });
+
+    if (qualifiedPool.length > 0) {
+      basePrizeList = qualifiedPool;
+    } else {
+      basePrizeList = allParticipants.length > 0 ? allParticipants : masterPool;
+    }
+  }
 
   // Filter out any participants who have already won a prize
   const availableParticipants: Participant[] = uniqueParticipants(basePrizeList)

@@ -409,14 +409,18 @@ export default function App() {
     ...prizes.flatMap(p => p.list)
   ]);
 
-  // Logic: If current prize has its own non-empty list, use that list;
-  // otherwise fallback to using all entered participants (masterPool)
-  const basePrizeList = (currentPrize && currentPrize.list.length > 0)
-    ? currentPrize.list
-    : masterPool;
+  // Logic: Accumulate participant lists from prize 0 up to current prize
+  const accumulatedPrizesList = prizes
+    .slice(0, currentPrizeIndex >= 0 ? currentPrizeIndex + 1 : prizes.length)
+    .flatMap(p => p.list);
+
+  // If accumulated list is non-empty, use it; otherwise fallback to masterPool / allParticipants
+  const basePool = accumulatedPrizesList.length > 0 
+    ? uniqueParticipants(accumulatedPrizesList)
+    : (masterPool.length > 0 ? masterPool : allParticipants);
 
   // Filter out any participants who have already won a prize
-  const availableParticipants: Participant[] = uniqueParticipants(basePrizeList)
+  const availableParticipants: Participant[] = basePool
     .filter(p => !winners.some(w => makeParticipantKey(w.person) === makeParticipantKey(p)));
 
   // All participants for display animation

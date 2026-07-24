@@ -9,8 +9,8 @@ import { Settings, Trophy, Users, Play, RotateCcw, Trash2, Plus, X, ListChecks, 
 import confetti from 'canvas-confetti';
 import { cn } from './lib/utils';
 import logoDefault from './Image/Logo/Logo SEVT.png';
-import heroDefault from './Image/Hero/hero.jpg';
-import spinSoundFile from './Sound/soundspin.mp3';
+import heroDefault from './Image/Hero/Hero.png';
+import spinSoundFile from './Sound/Nhacsoso.MP3';
 
 interface Participant {
   id: string;
@@ -52,8 +52,8 @@ interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  title: 'Lucky Draw Pro',
-  titleColor: '#eab308', // yellow-500
+  title: 'LUCKY DRAW',
+  titleColor: '#ffffff', // White
   titleSize: 48,
   titleFont: 'Inter',
   logoUrl: logoDefault,
@@ -72,10 +72,11 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const DEFAULT_PRIZES: Prize[] = [
-  { id: 'A', name: 'Giải A', quantity: 1, remaining: 1, list: [], color: '#eab308' },
-  { id: 'B', name: 'Giải B', quantity: 3, remaining: 3, list: [], color: '#3b82f6' },
-  { id: 'C', name: 'Giải C', quantity: 3, remaining: 3, list: [], color: '#10b981' },
-  { id: 'D', name: 'Giải D', quantity: 10, remaining: 10, list: [], color: '#8b5cf6' },
+  { id: 'A', name: 'Kim Long Plus', quantity: 1, remaining: 1, list: [], color: '#D4AF37' },
+  { id: 'B', name: 'Kim Long', quantity: 1, remaining: 1, list: [], color: '#DC143C' },
+  { id: 'C', name: 'Sóng Vàng', quantity: 1, remaining: 1, list: [], color: '#0077BE' },
+  { id: 'D', name: 'Ngọc Biển', quantity: 1, remaining: 1, list: [], color: '#14B8A6' },
+  { id: 'E', name: 'Tiểu Long', quantity: 1, remaining: 1, list: [], color: '#22C55E' },
 ];
 
 const SAMPLE_PARTICIPANTS: Record<string, Participant[]> = {
@@ -434,8 +435,10 @@ export default function App() {
     }
 
     const winner = availableParticipants[Math.floor(Math.random() * availableParticipants.length)];
+    const spinDurationMs = Math.max(2000, settings.spinDuration);
+
     pendingWinnerRef.current = winner;
-    spinEndTimeRef.current = Date.now() + settings.spinDuration;
+    spinEndTimeRef.current = Date.now() + spinDurationMs;
 
     setIsSpinning(true);
     setIsConfirming(false);
@@ -443,23 +446,48 @@ export default function App() {
     
     void playSpinSound();
     
-    // Shuffle animation
-    spinIntervalRef.current = window.setInterval(() => {
+    // Phase-based spin animation
+    const runSpinFrame = () => {
       const endTime = spinEndTimeRef.current;
       const pendingWinner = pendingWinnerRef.current;
+      if (!endTime || !pendingWinner) return;
 
-      if (pendingWinner && endTime && Date.now() >= endTime - 150) {
+      const remaining = endTime - Date.now();
+      let nextDelay = 40;
+
+      if (remaining <= 700) {
+        // GDD4: lock winner for the final 700ms
         setDisplayPerson(pendingWinner);
-        return;
+        nextDelay = 700;
+      } else if (remaining <= 2000) {
+        // GDD3: slow down to ~3 updates per second
+        const randomIndex = Math.floor(Math.random() * displayParticipants.length);
+        setDisplayPerson(displayParticipants[randomIndex]);
+        nextDelay = 333;
+      } else if (remaining <= 3000) {
+        // GDD2: slow down to ~6 updates per second
+        const randomIndex = Math.floor(Math.random() * displayParticipants.length);
+        setDisplayPerson(displayParticipants[randomIndex]);
+        nextDelay = 167;
+      } else {
+        // GDD1: fast spin at ~25 updates per second
+        const randomIndex = Math.floor(Math.random() * displayParticipants.length);
+        setDisplayPerson(displayParticipants[randomIndex]);
+        nextDelay = 40;
       }
 
-      const randomIndex = Math.floor(Math.random() * displayParticipants.length);
-      setDisplayPerson(displayParticipants[randomIndex]);
-    }, 40); // Faster spin
+      spinIntervalRef.current = window.setTimeout(runSpinFrame, nextDelay);
+    };
+
+    runSpinFrame();
 
     // Stop spin after duration
-    setTimeout(() => {
+    const stopTimeout = window.setTimeout(() => {
       if (spinIntervalRef.current) clearInterval(spinIntervalRef.current);
+      if (spinIntervalRef.current) {
+        clearTimeout(spinIntervalRef.current);
+        spinIntervalRef.current = null;
+      }
       
       // Stop spin sound
       stopSpinSound();
@@ -487,7 +515,9 @@ export default function App() {
         origin: { y: 0.6 },
         colors: ['#FFD700', '#FFA500', '#FF4500', '#FFFFFF']
       });
-    }, settings.spinDuration);
+    }, spinDurationMs);
+
+    void stopTimeout;
   }, [isSpinning, availableParticipants, currentPrize, settings.spinDuration, playSpinSound, playWinSound, stopSpinSound]);
 
   const handleConfirmWinner = () => {

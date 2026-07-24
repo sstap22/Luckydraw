@@ -455,10 +455,10 @@ export default function App() {
       const remaining = endTime - Date.now();
       let nextDelay = 40;
 
-      if (remaining <= 700) {
-        // GDD4: lock winner for the final 700ms
+      if (remaining <= 1500) {
+        // GDD4: lock winner for the final 1500ms
         setDisplayPerson(pendingWinner);
-        nextDelay = 700;
+        nextDelay = 1500;
       } else if (remaining <= 2000) {
         // GDD3: slow down to ~3 updates per second
         const randomIndex = Math.floor(Math.random() * displayParticipants.length);

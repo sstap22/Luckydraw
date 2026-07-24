@@ -374,6 +374,18 @@ export default function App() {
     setParticipantDrafts(initialDrafts);
   }, [showParticipants, prizes]);
 
+  // Keyboard shortcut Ctrl + Shift + Q to open Admin Participant List
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'q' || e.key === 'Q' || e.code === 'KeyQ')) {
+        e.preventDefault();
+        handleOpenParticipants();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const currentPrizeIndex = prizes.findIndex(p => p.id === currentPrizeId);
   const currentPrize = prizes[currentPrizeIndex];
 
@@ -764,16 +776,9 @@ export default function App() {
               )}
             </button>
             <button 
-              onClick={handleOpenParticipants}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors relative bg-slate-800/50"
-              title="Danh sách người tham gia (Admin)"
-            >
-              <Users size={24} />
-            </button>
-            <button 
               onClick={() => setShowSettings(true)}
               className="p-2 hover:bg-white/10 rounded-full transition-colors bg-slate-800/50"
-              title="Cài đặt"
+              title="Cài đặt (Ctrl + Shift + Q để mở danh sách người tham gia)"
             >
               <Settings size={24} />
             </button>
@@ -1003,7 +1008,17 @@ export default function App() {
           >
             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900 sticky top-0 z-10">
               <h2 className="text-xl font-bold flex items-center gap-2">
-                <Settings size={20} /> Cài đặt chương trình
+                <button
+                  onClick={() => {
+                    setShowSettings(false);
+                    handleOpenParticipants();
+                  }}
+                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-yellow-400 transition-colors cursor-pointer"
+                  title="Cấu hình danh sách theo giải (Phím tắt: Ctrl + Shift + Q)"
+                >
+                  <Settings size={20} />
+                </button>
+                <span>Cài đặt chương trình</span>
               </h2>
               <div className="flex gap-2">
                 <button 

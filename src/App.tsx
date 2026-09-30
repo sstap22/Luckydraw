@@ -135,6 +135,7 @@ export default function App() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [showFullInfo, setShowFullInfo] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showDeletePlayerModal, setShowDeletePlayerModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [deleteWinnerTarget, setDeleteWinnerTarget] = useState<{ prizeId: string; personId: string; personName: string } | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -146,6 +147,7 @@ export default function App() {
   const [participantSearchQuery, setParticipantSearchQuery] = useState('');
   const [passwordModalType, setPasswordModalType] = useState<'delete' | 'admin' | null>(null);
   const [participantDrafts, setParticipantDrafts] = useState<Record<string, string>>({});
+  const [allParticipantsDraft, setAllParticipantsDraft] = useState<string>('');
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const spinAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -343,6 +345,7 @@ export default function App() {
       setTempSettings(settings);
       setTempPrizes(prizes);
       setTempAllParticipants(allParticipants);
+      setAllParticipantsDraft(allParticipants.map(p => `${p.name},${p.id}`).join('\n'));
       setKoreanSettingsUnlocked(false);
     }
   }, [showSettings, settings, prizes, allParticipants]);
@@ -563,7 +566,41 @@ export default function App() {
     setDisplayPerson(null);
     setIsConfirming(false);
     setShowFullInfo(false);
+    setShowDeletePlayerModal(false);
     showNotification('Đã hủy lượt quay vừa rồi!', 'info');
+  };
+
+  const handleDeleteCurrentParticipantFromAllLists = () => {
+    if (!displayPerson) return;
+    const targetKey = makeParticipantKey(displayPerson);
+    const deletedName = displayPerson.name;
+    const deletedId = displayPerson.id;
+
+    // 1. Remove from allParticipants & tempAllParticipants
+    setAllParticipants(prev => prev.filter(p => makeParticipantKey(p) !== targetKey));
+    setTempAllParticipants(prev => prev.filter(p => makeParticipantKey(p) !== targetKey));
+
+    // 2. Remove from all prize lists
+    setPrizes(prev =>
+      prev.map(prize => ({
+        ...prize,
+        list: prize.list.filter(p => makeParticipantKey(p) !== targetKey)
+      }))
+    );
+    setTempPrizes(prev =>
+      prev.map(prize => ({
+        ...prize,
+        list: prize.list.filter(p => makeParticipantKey(p) !== targetKey)
+      }))
+    );
+
+    // 3. Reset draw confirmation state
+    setDisplayPerson(null);
+    setIsConfirming(false);
+    setShowFullInfo(false);
+    setShowDeletePlayerModal(false);
+
+    showNotification(`Đã xóa người chơi ${deletedName} (${deletedId}) khỏi tất cả danh sách quay số!`, 'success');
   };
 
   const resetWinners = () => {
@@ -670,6 +707,17 @@ export default function App() {
   };
 
   const handleSaveSettings = () => {
+    // Parse allParticipantsDraft to obtain updated allParticipants list
+    const rawLines = allParticipantsDraft.split('\n').filter(l => l.trim());
+    const parsedList = rawLines.map(line => {
+      const parts = line.split(',');
+      const name = parts[0]?.trim() || '';
+      const id = parts.slice(1).join(',').trim() || name;
+      return { name: name || 'N/A', id: id || 'N/A' };
+    }).filter(p => p.name !== 'N/A' || p.id !== 'N/A');
+
+    const updatedAllParticipants = uniqueParticipants(parsedList);
+
     // Use the edited temp list as the source of truth so deleted prizes stay deleted.
     const newPrizes = tempPrizes.map(tempPrize => {
       const existingPrize = prizes.find(prize => prize.id === tempPrize.id);
@@ -681,13 +729,14 @@ export default function App() {
     
     // Save to localStorage immediately
     localStorage.setItem('lucky-draw-prizes', JSON.stringify(newPrizes));
-    localStorage.setItem('lucky-draw-all-participants', JSON.stringify(tempAllParticipants));
+    localStorage.setItem('lucky-draw-all-participants', JSON.stringify(updatedAllParticipants));
     
     // Update state
     setSettings(tempSettings);
     setPrizes(newPrizes);
     setCurrentPrizeId(prev => (newPrizes.some(prize => prize.id === prev) ? prev : newPrizes[0]?.id || ''));
-    setAllParticipants(uniqueParticipants(tempAllParticipants));
+    setAllParticipants(updatedAllParticipants);
+    setTempAllParticipants(updatedAllParticipants);
     setShowSettings(false);
     
     // confetti for feedback
@@ -906,13 +955,24 @@ export default function App() {
                   {isConfirming && showFullInfo && (
                     <div className="mt-8 flex gap-4 justify-center">
                       <div className="flex flex-col items-center gap-2">
-                        <button
-                          onClick={handleCancelWinner}
-                          className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold flex items-center gap-2 transition-all active:scale-95 border border-white/10"
-                        >
-                          <RotateCcw size={20} />
-                          Quay lại
-                        </button>
+                        <div className="flex items-center rounded-2xl bg-slate-800 border border-white/10 overflow-hidden hover:bg-slate-700/80 transition-all shadow-lg">
+                          <button
+                            onClick={handleCancelWinner}
+                            className="pl-7 pr-4 py-4 text-white font-bold flex items-center gap-2 transition-all active:scale-95"
+                            title="Quay lại lượt trước (không xóa người chơi)"
+                          >
+                            <RotateCcw size={20} />
+                            Quay lại
+                          </button>
+                          <div className="h-6 w-[1px] bg-white/15" />
+                          <button
+                            onClick={() => setShowDeletePlayerModal(true)}
+                            className="pl-3 pr-5 py-4 text-red-400 hover:text-red-300 hover:bg-red-500/20 active:bg-red-500/30 font-bold flex items-center gap-1.5 transition-all"
+                            title="Xóa người chơi khỏi tất cả danh sách quay số"
+                          >
+                            <Trash2 size={19} />
+                          </button>
+                        </div>
                         <div
                           className="italic leading-none"
                           style={{ color: settings.koreanLabelColor, fontSize: `${settings.koreanLabelSize}px` }}
@@ -1045,13 +1105,18 @@ export default function App() {
                   <textarea 
                     rows={6}
                     placeholder="Nguyễn Văn A,A001&#10;Trần Thị B,B001&#10;Lê Văn C,C001"
-                    value={tempAllParticipants.map(p => `${p.name},${p.id}`).join('\n')}
+                    value={allParticipantsDraft}
                     onChange={(e) => {
-                      const lines = e.target.value.split('\n').filter(l => l.trim());
+                      const nextText = e.target.value;
+                      setAllParticipantsDraft(nextText);
+                      
+                      const lines = nextText.split('\n').filter(l => l.trim());
                       const newList = lines.map(line => {
-                        const [name, id] = line.split(',').map(s => s.trim());
+                        const parts = line.split(',');
+                        const name = parts[0]?.trim() || '';
+                        const id = parts.slice(1).join(',').trim() || name;
                         return { name: name || 'N/A', id: id || 'N/A' };
-                      });
+                      }).filter(p => p.name !== 'N/A' || p.id !== 'N/A');
                       setTempAllParticipants(uniqueParticipants(newList));
                     }}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-yellow-500"
@@ -1626,6 +1691,49 @@ export default function App() {
                   className="flex-1 py-3 bg-blue-500 hover:bg-blue-400 text-white rounded-xl font-bold transition-all"
                 >
                   Xác nhận
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Delete Participant Confirmation Modal */}
+        {showDeletePlayerModal && displayPerson && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-slate-900 w-full max-w-md rounded-3xl border border-red-500/30 shadow-2xl p-6 sm:p-8 space-y-6 text-white"
+            >
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center text-red-500">
+                  <Trash2 size={32} />
+                </div>
+                <h2 className="text-xl font-bold text-white">Xóa người chơi khỏi danh sách quay số</h2>
+                <div className="bg-slate-800/80 border border-white/10 rounded-2xl p-4 w-full text-left space-y-1">
+                  <p className="text-sm text-slate-400">Người chơi vừa quay:</p>
+                  <p className="text-lg font-bold text-yellow-400">{displayPerson.name}</p>
+                  <p className="text-xs text-slate-300 font-mono">GEN/ID: {displayPerson.id}</p>
+                </div>
+                <p className="text-red-400/90 text-sm font-medium bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-left">
+                  ⚠️ Người chơi này sẽ bị xóa khỏi <b>tất cả các danh sách quay số</b> và không thể xuất hiện trong các lượt quay tiếp theo.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeletePlayerModal(false)}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleDeleteCurrentParticipantFromAllLists}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-600/20"
+                >
+                  <Trash2 size={18} />
+                  Xác nhận xóa
                 </button>
               </div>
             </motion.div>
